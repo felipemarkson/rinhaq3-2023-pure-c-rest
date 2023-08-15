@@ -1,0 +1,10 @@
+version: '3.5'
+services:
+  api: # API - Instância 01
+    image: rinha:latest
+    ports:
+     - 8888:8888
+    networks:
+      - api-side
+networks:
+  api-side: {}
