@@ -6,5 +6,7 @@ services:
      - 8888:8888
     networks:
       - api-side
+    stdin_open: true
+    tty: true
 networks:
   api-side: {}
