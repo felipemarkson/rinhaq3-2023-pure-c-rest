@@ -1,3 +1,10 @@
 #!/bin/sh
+CFLAGS=""
+if [ $# -eq 0 ]
+  then
+   CFLAGS="-Ofast"
+else
+   CFLAGS="-Og -ggdb -DDEBUG -fanalyzer -Wanalyzer-too-complex -Wall -Wswitch-enum -Wextra -Werror"
+fi
 set -xe
-cc main.c -o main
+gcc $CFLAGS main.c -o main -lmicrohttpd

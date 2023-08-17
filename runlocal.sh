@@ -1,3 +1,8 @@
+#!/bin/sh
+
 set -e
-sudo docker build . -t rinha && \
-sudo docker compose up
+
+cd ./src && \
+./build.sh DEBUG && \
+cd ..
+./src/main
