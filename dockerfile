@@ -1,10 +1,10 @@
-FROM alpine:latest
+FROM debian:latest
 
-RUN apk add build-base libmicrohttpd-dev sqlite-dev
+RUN apt-get update && apt-get install -y build-essential libmicrohttpd-dev
 
 COPY ./src ./
 
-RUN chmod +x build.sh && ./build.sh
+RUN chmod +x build.sh && ./build.sh -D
 
 EXPOSE 8888
 CMD ["/bin/sh", "-c" , "./main"]

@@ -1,16 +1,11 @@
+#pragma once
 #include "common.h"
 #include "pessoa.c"
+#include "test.h"
 
 #define ROOT_RESPONSE "{\"response\": \"ok\"}"
 #define BAD_REQUEST_RESPONSE "{\"response\": \"bad\"}"
-#define POSTBUFFERSIZE 1024
 #define MSG_ERR "Internal error on line %d: "
-
-Pessoa_str pessoa_test = {.id = "1",
-                          .apelido = "apelido-test",
-                          .nome = "nome-test",
-                          .nascimento = "01/01/2001",
-                          .stack = "\"Node\",\"C#\",\"Python\""};
 
 typedef enum {
     POST_STAGE_INITIALYZING = 0,
@@ -25,10 +20,8 @@ typedef enum {
 } Response;
 
 typedef struct {
-    char* data;
     Response http_code;
     Post_stage stage;
-    size_t data_size;
 } Post;
 
 struct MHD_Response* build_response(char* json, enum MHD_ResponseMemoryMode mode) {
@@ -55,9 +48,9 @@ bool get_root(struct MHD_Response** out_response) {
 }
 
 bool get_pessoas_id(const char* uuid, struct MHD_Response** out_response) {
-    char buffer[512] = {0};
-    pessoa_test.id = (char*)uuid;
-    pessoa_as_json(buffer, 512, &pessoa_test);
+    char buffer[MAX_JSON_PAYLOAD + 1] = {0};
+    strncpy(pessoa_test.id, uuid, UUID_STR_LEN);
+    pessoa_as_json(MAX_JSON_PAYLOAD + 1, buffer, &pessoa_test);
     LOG(stdout, "Data send: %s\n", buffer);
     *out_response = build_response(buffer, MHD_RESPMEM_MUST_COPY);
     return true;
@@ -143,7 +136,7 @@ enum MHD_Result handler(void* cls, struct MHD_Connection* connection, const char
         }
 
         Post* post = *reqptr;
-        post->data_size = *upload_data_size;
+        size_t data_size = *upload_data_size;
         *upload_data_size = 0;  // Zeroing to the next stage.
         post->stage += 1;
         switch (post->stage) {
@@ -154,18 +147,37 @@ enum MHD_Result handler(void* cls, struct MHD_Connection* connection, const char
                 return MHD_YES;
             }
             case POST_STAGE_PROCESSING: {
-                if (!isvalid_post(post->data_size, url)) {
+                if (!isvalid_post(data_size, url)) {
                     post->http_code = RESPONSE_UNPROCESSABLE;
                     return MHD_YES;
                 }
-                post->data = calloc(post->data_size + 1, 1);
-                if (NULL == (post->data)) {
-                    LOG(stderr, MSG_ERR "No memory\n", __LINE__);
-                    post->http_code = RESPONSE_INTERNAL_ERROR;
-                    return MHD_YES;
-                }
-
                 LOG(stdout, "POST REQ: URL %s | Data recived: %s\n", url, upload_data);
+                Pessoa pessoa = {0};
+                enum JSON_PARSER_ERROR ret =
+                    json_as_pessoa(upload_data, data_size, false, &pessoa);
+                switch (ret) {
+                    case JSON_PARSER_OK: {
+                        post->http_code = RESPONSE_ACCEPTED;
+                        break;
+                    }
+                    case JSON_PARSER_INVALID: {
+                        post->http_code = RESPONSE_UNPROCESSABLE;
+                        return MHD_YES;
+                    }
+                    case JSON_PARSER_MEM: {
+                        post->http_code = RESPONSE_INTERNAL_ERROR;
+                        return MHD_YES;
+                    }
+                    default: {
+                        LOG(stderr, MSG_ERR "Unreachable state\n", __LINE__);
+                        post->http_code = RESPONSE_INTERNAL_ERROR;
+                        return MHD_YES;
+                    }
+                }
+                char buffer[MAX_JSON_PAYLOAD] = {0};
+                pessoa_as_json(MAX_JSON_PAYLOAD, buffer, &pessoa);
+                LOG(stdout, "Data Processed: %s\n", buffer);
+
                 // TODO: process the data.
                 post->http_code = RESPONSE_ACCEPTED;
                 return MHD_YES;

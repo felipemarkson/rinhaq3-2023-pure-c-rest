@@ -1,4 +1,6 @@
-#include <sqlite3.h>
+#pragma once
+#include "sqlite3/sqlite3.h"
+
 
 #include "common.h"
 
@@ -20,7 +22,7 @@
 
 #define LISTTABLES                                                          \
     "SELECT name FROM sqlite_schema WHERE type ='table' AND name NOT LIKE " \
-    "'sqlite_\%';"
+    "'sqlite_%%';"
 
 bool db_open(void **db) {
     sqlite3 *inner_db;
@@ -36,9 +38,6 @@ bool db_open(void **db) {
 
 void db_close(void **db) { sqlite3_close((sqlite3 *)*db); }
 
-typedef struct {
-    /* data */
-} Sql_result;
 
 bool db_create_tables(void **db) {
     char *zErrMsg = NULL;
@@ -83,4 +82,10 @@ bool db_list_tables(void **db) {
     }
 
     return true;
+}
+
+
+bool db_insert_pessoa(const Pessoa * pessoa){
+    (void)pessoa;
+    return false;
 }

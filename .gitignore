@@ -1,2 +1,5 @@
 src/main
+src/sqlite3
 .vscode/*
+*.o
+*.a

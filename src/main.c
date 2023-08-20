@@ -14,7 +14,7 @@ void sighandler(int sig) {
         printf("received SIGSEGV oh... oh...\n");
     fflush(stdout);
     db_close(g_db);
-    _exit(EXIT_SUCCESS);
+    _exit(sig);
 }
 
 int main(void) {
