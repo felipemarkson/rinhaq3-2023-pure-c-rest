@@ -33,7 +33,9 @@ void pessoa_as_json(size_t buffer_size, char in_out_buffer[static buffer_size],
     char date[11] = {0};
     strftime(date, NASCIMENTO_STR_LEN + 1, "%F", &(pessoa->nascimento));
 
-    snprintf(in_out_buffer, buffer_size, PESSOA_TEMPLATE, pessoa->id, pessoa->apelido,
+    char uuid_str[ID_STR_LEN + 1] = {0};
+    uuid_unparse(pessoa->id, uuid_str);
+    snprintf(in_out_buffer, buffer_size, PESSOA_TEMPLATE, uuid_str, pessoa->apelido,
              pessoa->nome, date, list_str);
 }
 
@@ -71,7 +73,7 @@ enum JSON_PARSER_ERROR get_field_array_of_str(
         struct json_value_s* value = array_elem->value;
         if (value->type != json_type_string) return JSON_PARSER_INVALID;
         int ret = get_field_str(max_str_len, 0,
-                                &GET_ITEM_FROM_ARRAY(out, row, max_str_len+1), value);
+                                &GET_ITEM_FROM_ARRAY(out, row, max_str_len + 1), value);
         if (ret != JSON_PARSER_OK) return ret;
         array_elem = array_elem->next;
         ++row;
@@ -91,6 +93,8 @@ enum JSON_PARSER_ERROR json_as_pessoa(const char* in, size_t in_size, bool has_i
 
     size_t min_itens = has_id ? PESSOA_MIN_FIELDS : PESSOA_MIN_FIELDS - 1;
 
+    enum JSON_PARSER_ERROR ret;
+
     if (object->length < min_itens) return JSON_PARSER_INVALID;
     struct json_object_element_s* field = object->start;
     if (field == NULL) return JSON_PARSER_INVALID;
@@ -108,15 +112,15 @@ enum JSON_PARSER_ERROR json_as_pessoa(const char* in, size_t in_size, bool has_i
                 return JSON_PARSER_INVALID;
         } else if (streq(field_name, "nome")) {
             if (field_value->type == json_type_string) {
-                int ret = get_field_str(NOME_STR_LEN, 1, pessoa->nome, field_value);
+                ret = get_field_str(NOME_STR_LEN, 1, pessoa->nome, field_value);
                 if (ret != JSON_PARSER_OK) return ret;
             } else
                 return JSON_PARSER_INVALID;
         } else if (streq(field_name, "nascimento")) {
             if (field_value->type == json_type_string) {
                 char date[NASCIMENTO_STR_LEN + 1] = {0};
-                int ret = get_field_str(NASCIMENTO_STR_LEN, NASCIMENTO_STR_LEN, date,
-                                        field_value);
+                ret = get_field_str(NASCIMENTO_STR_LEN, NASCIMENTO_STR_LEN, date,
+                                    field_value);
                 if (ret != JSON_PARSER_OK) return ret;
                 char* out = strptime(date, "%F", &(pessoa->nascimento));
                 if (out[0] != '\0') return JSON_PARSER_INVALID;
@@ -124,13 +128,19 @@ enum JSON_PARSER_ERROR json_as_pessoa(const char* in, size_t in_size, bool has_i
                 return JSON_PARSER_INVALID;
         } else if (streq(field_name, "stack")) {
             if (field_value->type == json_type_array) {
-                int ret = get_field_array_of_str(MAX_STACK_ITEMS, 0, ITEM_STR_LEN,
-                                                 pessoa->stack, field_value);
+                ret = get_field_array_of_str(MAX_STACK_ITEMS, 0, ITEM_STR_LEN,
+                                             pessoa->stack, field_value);
                 if (ret != JSON_PARSER_OK) return ret;
             } else if (field_value->type == json_type_null)
                 pessoa->stack[0] = '\0';
             else
                 return JSON_PARSER_INVALID;
+        } else if (streq(field_name, "id")) {
+            char uuid[ID_STR_LEN + 1] = {0};
+            ret = get_field_str(ID_STR_LEN, ID_STR_LEN, uuid, field_value);
+            if (ret != JSON_PARSER_OK) return ret;
+            ret = uuid_parse(uuid, pessoa->id);
+            if (ret != 0) return JSON_PARSER_INVALID;
         } else {
             return JSON_PARSER_INVALID;
         }
@@ -139,4 +149,10 @@ enum JSON_PARSER_ERROR json_as_pessoa(const char* in, size_t in_size, bool has_i
 
     free(root);
     return JSON_PARSER_OK;
+}
+
+void print_pessoa(const Pessoa* pessoa) {
+    char buffer[MAX_JSON_PAYLOAD + 1] = {0};
+    pessoa_as_json(MAX_JSON_PAYLOAD, buffer, pessoa);
+    LOG(stdout, "Pessoa: %s\n", buffer);
 }

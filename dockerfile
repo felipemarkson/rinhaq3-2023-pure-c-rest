@@ -1,6 +1,6 @@
 FROM debian:latest
 
-RUN apt-get update && apt-get install -y build-essential libmicrohttpd-dev
+RUN apt-get update && apt-get install -y build-essential libmicrohttpd-dev uuid-dev
 
 COPY ./src ./
 

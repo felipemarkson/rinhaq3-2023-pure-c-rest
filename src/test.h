@@ -2,7 +2,7 @@
 #include "common.h"
 
 Pessoa pessoa_test = {
-    .id = "550e8400-e29b-41d4-a716-446655440000",
+    .id = {'a','a','a','a','a','a','a','a','a','a','a','a','a','a','a','a'},
     .apelido = "NiPvNA7KEtoI80OgtvginZbQhuV68rMN",
     .nome =
         "Tr4QlgF30YxkyALq3fZhojsC1iphwRD4WibpnrWweQv6mBO8j4MQiVgBZGCjfV9F37m4DP2z56n0zE"

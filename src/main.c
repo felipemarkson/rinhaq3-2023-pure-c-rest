@@ -1,9 +1,9 @@
 #include "common.h"
-#include "handler.c"
 #include "db.c"
+#include "handler.c"
 
 #define PORT 8888
-void* g_db = NULL;
+void *g_db = NULL;
 
 void sighandler(int sig) {
     if (sig == SIGINT)
@@ -37,8 +37,9 @@ int main(void) {
     if (!db_list_tables(&g_db)) return EXIT_FAILURE;
 
     MHD_AccessHandlerCallback dh = (MHD_AccessHandlerCallback)&handler;
-    struct MHD_Daemon* d = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY, PORT, NULL, NULL,
-                                            dh, NULL, MHD_OPTION_END);
+    struct MHD_Daemon *d = MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION, PORT, NULL,
+                                            NULL, dh, NULL, MHD_OPTION_NOTIFY_COMPLETED,
+                                            &request_completed, NULL, MHD_OPTION_END);
     if (d == NULL) {
         LOG(stderr, "Error on start deamon\n");
         return 1;

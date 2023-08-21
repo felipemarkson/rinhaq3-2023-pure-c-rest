@@ -4,7 +4,7 @@ if [ $# -eq 0 ]
   then
    CFLAGS="-Ofast"
 else
-   CFLAGS="-Og -ggdb -std=c11 -pedantic -DDEBUG -Wanalyzer-too-complex -Wall -Wswitch-enum -Wextra -Werror"
+   CFLAGS="-Og -ggdb -std=c11 -pedantic -DDEBUG -Wanalyzer-too-complex -Wall -Wswitch-default  -Wswitch-enum -Wextra -Werror"
 fi
 
 SQLITE_FLAGS=" \
@@ -28,5 +28,7 @@ if [ ! -d sqlite3 ]; then
    chmod +x get_sqlite3.sh
    ./get_sqlite3.sh
 fi
+if [ ! -f sqlite3.o ]; then
 gcc -c  $SQLITE_FLAGS sqlite3/sqlite3.c
-gcc $CFLAGS main.c sqlite3.o -o main -Isqlite  -lmicrohttpd
+fi
+gcc $CFLAGS main.c sqlite3.o -o main -Isqlite -lmicrohttpd -luuid

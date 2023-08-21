@@ -14,7 +14,11 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <uuid/uuid.h>
 
+#define MSG_ERR "Internal error on line %d: "
+#define MAX_DB_TRIES 10
+#define DB_ADDR "db.sqlite"
 #ifdef DEBUG
 #define LOG(...) fprintf(__VA_ARGS__)
 #else
@@ -23,7 +27,7 @@
 
 #define MAX_JSON_PAYLOAD (3 * 1024)
 
-#define UUID_STR_LEN 36
+#define ID_STR_LEN 36
 #define APELIDO_STR_LEN 32
 #define NOME_STR_LEN 100
 #define NASCIMENTO_STR_LEN 10
@@ -39,7 +43,7 @@
 #define GET_ITEM(stack, row) GET_ITEM_FROM_ARRAY((stack), (row), (ITEM_STR_LEN + 1))
 
 typedef struct Pessoa {
-    char id[UUID_STR_LEN + 1];
+    uuid_t id;
     char apelido[APELIDO_STR_LEN + 1];
     char nome[NOME_STR_LEN + 1];
     struct tm nascimento;
@@ -47,5 +51,6 @@ typedef struct Pessoa {
 } Pessoa;
 
 bool streq(const char* str1, const char* str2) { return (0 == strcmp(str1, str2)); }
+void print_pessoa(const Pessoa* pessoa);
 
 #endif
