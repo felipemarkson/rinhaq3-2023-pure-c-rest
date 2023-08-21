@@ -186,7 +186,9 @@ enum DB_GET_RESULT db_get_apelido_exists(void **db, char apelido[static 2]) {
         return DB_GET_INTERNAL_ERROR;
     }
 
-    ret = sqlite3_bind_text(stmt, 1, apelido, strlen(apelido), SQLITE_STATIC);
+    int size = strlen(apelido) > APELIDO_STR_LEN ? APELIDO_STR_LEN : strlen(apelido);
+
+    ret = sqlite3_bind_text(stmt, 1, apelido, size, SQLITE_STATIC);
     if (ret != SQLITE_OK) {
         LOG(stderr, MSG_ERR "DB_ERR %d: %s\n", __LINE__, ret, sqlite3_errmsg(inner_db));
         sqlite3_finalize(stmt);
