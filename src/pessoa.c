@@ -14,29 +14,48 @@
     "\"stack\":[%s]"         \
     "}"
 
-void pessoa_as_json(size_t buffer_size, char in_out_buffer[static buffer_size],
-                    const Pessoa* pessoa) {
-    char list_str[MAX_STACK_LIST_WCOMMA_STR_LEN + 1] = {0};
-    size_t list_str_index = 0;
+// Assuming buffer is zero initilialized. Output Example: ""C#", "Python", "C++""
+void parse_stack_tostr(const char stack[MAX_STACK_SIZE],
+                       char buffer[MAX_STACK_LIST_WCOMMA_STR_LEN + 1]) {
+    size_t buffer_index = 0;
     size_t stack_index = 0;
     size_t last_len = 0;
-    while ((list_str_index < MAX_STACK_LIST_WCOMMA_STR_LEN) &&
+    while ((buffer_index < MAX_STACK_LIST_WCOMMA_STR_LEN) &&
            (stack_index < MAX_STACK_ITEMS)) {
-        const char* stack_str = &GET_ITEM(pessoa->stack, stack_index);
+        const char* stack_str = &GET_ITEM(stack, stack_index);
         if (stack_str[0] == '\0') break;
         last_len = strlen(stack_str);
-        sprintf(&(list_str[list_str_index]), "\"%s\",", stack_str);
-        list_str_index += last_len + 3;
+        sprintf(&(buffer[buffer_index]), "\"%s\",", stack_str);
+        buffer_index += last_len + 3;
         ++stack_index;
     }
-    list_str[list_str_index - 1] = '\0';
+    buffer[buffer_index - 1] = '\0';
+}
+
+void parse_str_tostack(char buffer[MAX_STACK_LIST_WCOMMA_STR_LEN + 1],
+                       char stack[MAX_STACK_SIZE]) {
+    const char delimiter[] = "\",";
+    char* next_token;
+    char* token = strtok_r(buffer, delimiter, &next_token);
+    for (size_t i = 0; i < MAX_STACK_ITEMS; i++) {
+        if (token == NULL) break;
+        char* item = &GET_ITEM(stack, i);
+        strncpy(item, token, ITEM_STR_LEN);
+        token = strtok_r(NULL, delimiter, &next_token);
+    }
+}
+
+int pessoa_as_json(size_t buffer_size, char in_out_buffer[static buffer_size],
+                   const Pessoa* pessoa) {
     char date[11] = {0};
+    char list_str[MAX_STACK_LIST_WCOMMA_STR_LEN + 1] = {0};
+    parse_stack_tostr(pessoa->stack, list_str);
     strftime(date, NASCIMENTO_STR_LEN + 1, "%F", &(pessoa->nascimento));
 
     char uuid_str[ID_STR_LEN + 1] = {0};
     uuid_unparse(pessoa->id, uuid_str);
-    snprintf(in_out_buffer, buffer_size, PESSOA_TEMPLATE, uuid_str, pessoa->apelido,
-             pessoa->nome, date, list_str);
+    return snprintf(in_out_buffer, buffer_size, PESSOA_TEMPLATE, uuid_str,
+                    pessoa->apelido, pessoa->nome, date, list_str);
 }
 
 enum JSON_PARSER_ERROR {
@@ -149,6 +168,25 @@ enum JSON_PARSER_ERROR json_as_pessoa(const char* in, size_t in_size, bool has_i
 
     free(root);
     return JSON_PARSER_OK;
+}
+
+// Assuming buffer was zero initialized;
+void parse_pessoas_as_list(char buffer[MAX_LIST_PESSOAS_PAYLOAD],
+                           const Pessoa pessoas[MAX_DB_PESSOAS]) {
+    buffer[0] = '[';
+    int buffer_index = 1;
+    size_t i = 0;
+    for (; i < MAX_DB_PESSOAS; i++) {
+        if (pessoas[i].apelido[0] == '\0') break;  // the last person
+        buffer_index +=
+            pessoa_as_json(MAX_JSON_PAYLOAD, &(buffer[buffer_index]), &(pessoas[i]));
+        buffer[buffer_index] = ',';
+        ++buffer_index;
+    }
+    if (i == 0)
+        buffer[1] = ']';
+    else
+        buffer[buffer_index - 1] = ']';  // replace last comma by ]
 }
 
 void print_pessoa(const Pessoa* pessoa) {

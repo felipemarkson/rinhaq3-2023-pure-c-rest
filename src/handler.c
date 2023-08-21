@@ -58,15 +58,14 @@ bool get_pessoas_id(const char* uuid, struct MHD_Response** out_response) {
         sleep(1);  // DB_BUSY;
     }
     if (NULL == db) {
-        fprintf(stderr, "Could not open a DB connection after %d tries\n",
-                MAX_DB_TRIES);
+        LOG(stderr, "Could not open a DB connection after %d tries\n", MAX_DB_TRIES);
         fflush(stderr);
         return false;  // TODO: THIS SHOULD BE INTERNAL ERROR.
     }
     enum DB_GET_RESULT result;
     result = db_get_pessoa(&db, &pessoa);
+    db_close(&db);
     if (result != DB_GET_OK) {
-        db_close(&db);
         return false;
     }
     char buffer[MAX_JSON_PAYLOAD + 1] = {0};
@@ -76,25 +75,68 @@ bool get_pessoas_id(const char* uuid, struct MHD_Response** out_response) {
     return true;
 }
 
-unsigned int get_handler(const char* url, struct MHD_Response** out_response) {
-    bool finded = false;
+bool get_pessoas_term(const char* term, struct MHD_Response** out_response) {
+    Pessoa pessoas[MAX_DB_PESSOAS] = {0};
+    void* db = NULL;
+    for (size_t count = 0; count < MAX_DB_TRIES; count++) {
+        if (db_open(&db)) break;
+        sleep(1);  // DB_BUSY;
+    }
+    if (NULL == db) {
+        LOG(stderr, "Could not open a DB connection after %d tries\n", MAX_DB_TRIES);
+        fflush(stderr);
+        return false;
+    }
 
-    if (0 == strcmp(url, "/")) {
-        finded = get_root(out_response);
-    } else if (strstr(url, "/pessoas/") == url) {
-        const char* uuid = &(url[9]);  // the 9 here is related to size of "/pessoas/"
-        finded = get_pessoas_id(uuid, out_response);
-    } else {
+    enum DB_GET_RESULT result;
+    result = db_get_pessoas_term(&db, term, pessoas);
+    if (result != DB_GET_OK) {
+        db_close(&db);
+        return false;
+    }
+    char buffer[MAX_LIST_PESSOAS_PAYLOAD] = {0};
+
+    parse_pessoas_as_list(buffer, pessoas);
+
+    // TODO: insert payload in the response and remove the line above.
+    *out_response = build_response(buffer, MHD_RESPMEM_MUST_COPY);
+
+    return true;
+}
+
+unsigned int get_handler(struct MHD_Connection* connection, const char* url,
+                         struct MHD_Response** out_response) {
+    if (strstr(url, "/pessoas") != url) {
         *out_response = bad_request();
         return MHD_HTTP_BAD_REQUEST;
     }
 
-    if (finded)
-        return MHD_HTTP_OK;
-    else {
+    if (strstr(url, "/pessoas/") == url) {
+        bool finded = false;
+        // The 9 here is related to size of "/pessoas/"
+        const char* uuid = (&url[9]);
+        finded = get_pessoas_id(uuid, out_response);
+        if (finded) return MHD_HTTP_OK;
         *out_response = build_response_empty();
         return MHD_HTTP_NOT_FOUND;
     }
+
+    if (streq(url, "/pessoas")) {
+        const char* term =
+            MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, "t");
+        if (term == NULL) {
+            *out_response = bad_request();
+            return MHD_HTTP_BAD_REQUEST;
+        }
+
+        bool ok = get_pessoas_term(term, out_response);
+        if (ok) return MHD_HTTP_OK;
+        *out_response = build_response_empty();
+        return MHD_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    *out_response = bad_request();
+    return MHD_HTTP_BAD_REQUEST;
 }
 
 bool isvalid_post(size_t size, const char* url) {
@@ -136,8 +178,7 @@ static void request_completed(void* cls, struct MHD_Connection* connection,
         sleep(1);  // DB_BUSY;
     }
     if (NULL == db) {
-        fprintf(stderr, "Could not open a DB connection after %d tries\n",
-                MAX_DB_TRIES);
+        LOG(stderr, "Could not open a DB connection after %d tries\n", MAX_DB_TRIES);
         fflush(stderr);
         return;
     }
@@ -163,7 +204,7 @@ enum MHD_Result handler(void* cls, struct MHD_Connection* connection, const char
     if (0 == strcmp(method, "GET")) {
         // NOTE: Body is ignored.
         LOG(stdout, "GET REQ -> URL:%s | ", url);
-        http_code = get_handler(url, &response);
+        http_code = get_handler(connection, url, &response);
         if (NULL == response) {
             LOG(stderr, "Internal error on %d: No memory\n", __LINE__);
             http_code = RESPONSE_INTERNAL_ERROR;
