@@ -105,8 +105,14 @@ enum JSON_PARSER_ERROR json_as_pessoa(const char* in, size_t in_size, bool has_i
                                       Pessoa* pessoa) {
     struct json_value_s* root = json_parse(in, in_size);
 
-    if (root == NULL) return JSON_PARSER_INVALID;
-    if (root->type != json_type_object) return JSON_PARSER_INVALID;
+    if (root == NULL) {
+        free(root);
+        return JSON_PARSER_INVALID;
+    }
+    if (root->type != json_type_object) {
+        free(root);
+        return JSON_PARSER_INVALID;
+    }
 
     struct json_object_s* object = (struct json_object_s*)root->payload;
 
@@ -114,11 +120,20 @@ enum JSON_PARSER_ERROR json_as_pessoa(const char* in, size_t in_size, bool has_i
 
     enum JSON_PARSER_ERROR ret;
 
-    if (object->length < min_itens) return JSON_PARSER_INVALID;
+    if (object->length < min_itens) {
+        free(root);
+        return JSON_PARSER_INVALID;
+    }
     struct json_object_element_s* field = object->start;
-    if (field == NULL) return JSON_PARSER_INVALID;
+    if (field == NULL) {
+        free(root);
+        return JSON_PARSER_INVALID;
+    }
     do {
-        if (field->name == NULL) return JSON_PARSER_INVALID;
+        if (field->name == NULL) {
+            free(root);
+            return JSON_PARSER_INVALID;
+        }
         const char* field_name = field->name->string;
         struct json_value_s* field_value = field->value;
 
@@ -126,41 +141,73 @@ enum JSON_PARSER_ERROR json_as_pessoa(const char* in, size_t in_size, bool has_i
             if (field_value->type == json_type_string) {
                 int value =
                     get_field_str(APELIDO_STR_LEN, 1, pessoa->apelido, field_value);
-                if (value != JSON_PARSER_OK) return value;
+                if (value != JSON_PARSER_OK) {
+                    free(root);
+                    return value;
+                }
             } else
                 return JSON_PARSER_INVALID;
         } else if (streq(field_name, "nome")) {
             if (field_value->type == json_type_string) {
                 ret = get_field_str(NOME_STR_LEN, 1, pessoa->nome, field_value);
-                if (ret != JSON_PARSER_OK) return ret;
-            } else
+                if (ret != JSON_PARSER_OK) {
+                    free(root);
+                    return ret;
+                }
+            } else {
+                free(root);
                 return JSON_PARSER_INVALID;
+            }
         } else if (streq(field_name, "nascimento")) {
             if (field_value->type == json_type_string) {
                 char date[NASCIMENTO_STR_LEN + 1] = {0};
                 ret = get_field_str(NASCIMENTO_STR_LEN, NASCIMENTO_STR_LEN, date,
                                     field_value);
-                if (ret != JSON_PARSER_OK) return ret;
+                if (ret != JSON_PARSER_OK) {
+                    free(root);
+                    return ret;
+                }
                 char* out = strptime(date, "%F", &(pessoa->nascimento));
-                if (out[0] != '\0') return JSON_PARSER_INVALID;
-            } else
+                if (out == NULL) {
+                    free(root);
+                    return JSON_PARSER_INVALID;
+                }
+                if (out[0] != '\0') {
+                    free(root);
+                    return JSON_PARSER_INVALID;
+                }
+            } else {
+                free(root);
                 return JSON_PARSER_INVALID;
+            }
         } else if (streq(field_name, "stack")) {
             if (field_value->type == json_type_array) {
                 ret = get_field_array_of_str(MAX_STACK_ITEMS, 0, ITEM_STR_LEN,
                                              pessoa->stack, field_value);
-                if (ret != JSON_PARSER_OK) return ret;
+                if (ret != JSON_PARSER_OK) {
+                    free(root);
+                    return ret;
+                }
             } else if (field_value->type == json_type_null)
                 pessoa->stack[0] = '\0';
-            else
+            else {
+                free(root);
                 return JSON_PARSER_INVALID;
+            }
         } else if (streq(field_name, "id")) {
             char uuid[ID_STR_LEN + 1] = {0};
             ret = get_field_str(ID_STR_LEN, ID_STR_LEN, uuid, field_value);
-            if (ret != JSON_PARSER_OK) return ret;
+            if (ret != JSON_PARSER_OK) {
+                free(root);
+                return ret;
+            }
             ret = uuid_parse(uuid, pessoa->id);
-            if (ret != 0) return JSON_PARSER_INVALID;
+            if (ret != 0) {
+                free(root);
+                return JSON_PARSER_INVALID;
+            }
         } else {
+            free(root);
             return JSON_PARSER_INVALID;
         }
 

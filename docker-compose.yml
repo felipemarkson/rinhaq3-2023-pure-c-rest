@@ -1,12 +1,58 @@
 version: '3.5'
 services:
-  api: # API - Instância 01
+  api1: # API - Instância 01
     image: rinha:latest
-    ports:
-     - 8888:8888
+    restart: always
     networks:
       - api-side
     stdin_open: true
     tty: true
+    volumes:
+      - shared:/db
+    deploy:
+      resources:
+        limits:
+          cpus: '0.65'
+          memory: '1.00GB'
+    
+  api2: # API - Instância 02
+    image: rinha:latest
+    restart: always
+    depends_on:
+      - api1
+    networks:
+      - api-side
+    stdin_open: true
+    tty: true
+    volumes:
+      - shared:/db
+    deploy:
+      resources:
+        limits:
+          cpus: '0.65'
+          memory: '1.00GB'
+
+  nginx: # Load Balancer
+    image: nginx:latest
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api1
+      - api2
+    ports:
+      - "9999:9999"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: '1.00GB'
+    networks:
+      - api-side
+
+
+volumes:
+  shared:
+
 networks:
   api-side: {}
+

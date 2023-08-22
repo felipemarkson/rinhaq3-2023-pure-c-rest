@@ -25,15 +25,34 @@
     "SELECT name FROM sqlite_schema WHERE type ='table' AND name NOT LIKE " \
     "'sqlite_%%';"
 
+#define DB_COMMAND_INNER(ret, command) \
+    ret = (command);                   \
+    while (ret == SQLITE_BUSY) {       \
+        nanosleep(&time2sleep, NULL);  \
+        ret = (command);               \
+    }
+
 bool db_open(void **db) {
     sqlite3 *inner_db;
-    int rc = sqlite3_open(DB_ADDR, &inner_db);
-    if (rc) {
+    int ret;
+    DB_COMMAND_INNER(ret, sqlite3_open(DB_ADDR, &inner_db))
+    if (ret) {
         LOG(stderr, "Can't open database: %s\n", sqlite3_errmsg(inner_db));
         fflush(stderr);
         sqlite3_close(inner_db);
         return false;
     }
+    // char *zErrMsg = NULL;
+    // DB_COMMAND_INNER(
+    //     ret, sqlite3_exec(inner_db, "PRAGMA journal_mode=WAL;", NULL, NULL,
+    //     &zErrMsg))
+    // if (ret != SQLITE_OK) {
+    //     LOG(stderr, "Can't open database. SQL error: %s\n", zErrMsg);
+    //     sqlite3_free(zErrMsg);
+    //     sqlite3_close(inner_db);
+    //     return false;
+    // }
+    // sqlite3_free(zErrMsg);
     *db = inner_db;
     return true;
 }
@@ -46,7 +65,8 @@ void db_close(void **db) {
 bool db_create_tables(void **db) {
     char *zErrMsg = NULL;
     int ret;
-    ret = sqlite3_exec((sqlite3 *)*db, CREATETABLE_PESSOA, NULL, NULL, &zErrMsg);
+    DB_COMMAND_INNER(
+        ret, sqlite3_exec((sqlite3 *)*db, CREATETABLE_PESSOA, NULL, NULL, &zErrMsg))
     if (ret != SQLITE_OK) {
         fprintf(stderr, "SQL error on creating table 'pessoa': %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
@@ -72,9 +92,10 @@ int db_list_tables_callback(void *ptr, int n_rows, char **rows, char **cols_name
 bool db_list_tables(void **db) {
     char *zErrMsg = NULL;
     int count = 0;
+    int ret;
     LOG(stdout, "Listing tables\n");
-    int ret = sqlite3_exec((sqlite3 *)*db, LISTTABLES, &db_list_tables_callback, &count,
-                           &zErrMsg);
+    DB_COMMAND_INNER(ret, sqlite3_exec((sqlite3 *)*db, LISTTABLES,
+                                       &db_list_tables_callback, &count, &zErrMsg))
     if (ret != SQLITE_OK) {
         fprintf(stderr, "SQL error: %s\n", zErrMsg);
         fflush(stderr);
@@ -88,30 +109,34 @@ bool db_list_tables(void **db) {
 bool db_inner_insert_pessoa(void **db, const Pessoa *pessoa) {
     sqlite3_stmt *stmt = NULL;
     sqlite3 *inner_db = *db;
-    int ret =
+    int ret;
+    DB_COMMAND_INNER(
+        ret,
         sqlite3_prepare_v2(inner_db,
                            "INSERT INTO pessoa(uuid, apelido, nome, stack, nascimento)"
                            " VALUES(?, ?, ?, ?, ?);",
-                           -1, &stmt, NULL);
+                           -1, &stmt, NULL))
     if (ret != SQLITE_OK) {
         LOG(stderr, MSG_ERR "DB_ERR: %s\n", __LINE__, sqlite3_errmsg(inner_db));
         sqlite3_finalize(stmt);
         return false;
     }
-    ret = sqlite3_bind_blob(stmt, 1, pessoa->id, sizeof(pessoa->id), SQLITE_STATIC);
+    DB_COMMAND_INNER(
+        ret, sqlite3_bind_blob(stmt, 1, pessoa->id, sizeof(pessoa->id), SQLITE_STATIC))
     if (ret != SQLITE_OK) {
         LOG(stderr, MSG_ERR "DB_ERR %d: %s\n", __LINE__, ret, sqlite3_errmsg(inner_db));
         sqlite3_finalize(stmt);
         return false;
     }
-    ret = sqlite3_bind_text(stmt, 2, pessoa->apelido, strlen(pessoa->apelido),
-                            SQLITE_STATIC);
+    DB_COMMAND_INNER(ret, sqlite3_bind_text(stmt, 2, pessoa->apelido,
+                                            strlen(pessoa->apelido), SQLITE_STATIC))
     if (ret != SQLITE_OK) {
         LOG(stderr, MSG_ERR "DB_ERR %d: %s\n", __LINE__, ret, sqlite3_errmsg(inner_db));
         sqlite3_finalize(stmt);
         return false;
     }
-    ret = sqlite3_bind_text(stmt, 3, pessoa->nome, strlen(pessoa->nome), SQLITE_STATIC);
+    DB_COMMAND_INNER(ret, sqlite3_bind_text(stmt, 3, pessoa->nome, strlen(pessoa->nome),
+                                            SQLITE_STATIC))
     if (ret != SQLITE_OK) {
         LOG(stderr, MSG_ERR "DB_ERR %d: %s\n", __LINE__, ret, sqlite3_errmsg(inner_db));
         sqlite3_finalize(stmt);
@@ -120,7 +145,8 @@ bool db_inner_insert_pessoa(void **db, const Pessoa *pessoa) {
 
     char buffer_stack[MAX_STACK_LIST_WCOMMA_STR_LEN + 1] = {0};
     parse_stack_tostr(pessoa->stack, buffer_stack);
-    ret = sqlite3_bind_text(stmt, 4, buffer_stack, strlen(buffer_stack), SQLITE_STATIC);
+    DB_COMMAND_INNER(ret, sqlite3_bind_text(stmt, 4, buffer_stack, strlen(buffer_stack),
+                                            SQLITE_STATIC))
     if (ret != SQLITE_OK) {
         LOG(stderr, MSG_ERR "DB_ERR %d: %s\n", __LINE__, ret, sqlite3_errmsg(inner_db));
         sqlite3_finalize(stmt);
@@ -129,22 +155,22 @@ bool db_inner_insert_pessoa(void **db, const Pessoa *pessoa) {
 
     char buff_nascimento[NASCIMENTO_STR_LEN + 2] = {0};
     strftime(buff_nascimento, NASCIMENTO_STR_LEN + 2, "%F", &(pessoa->nascimento));
-    ret = sqlite3_bind_text(stmt, 5, buff_nascimento, strlen(buff_nascimento),
-                            SQLITE_STATIC);
+    DB_COMMAND_INNER(ret, sqlite3_bind_text(stmt, 5, buff_nascimento,
+                                            strlen(buff_nascimento), SQLITE_STATIC))
     if (ret != SQLITE_OK) {
         LOG(stderr, MSG_ERR "DB_ERR %d: %s\n", __LINE__, ret, sqlite3_errmsg(inner_db));
         sqlite3_finalize(stmt);
         return false;
     }
 
-    ret = sqlite3_step(stmt);
+    DB_COMMAND_INNER(ret, sqlite3_step(stmt))
     bool ret_ok = (ret == SQLITE_OK) | (ret == SQLITE_ROW) | (ret == SQLITE_DONE);
     if (!ret_ok) {
         LOG(stderr, MSG_ERR "DB_ERR %d: %s\n", __LINE__, ret, sqlite3_errmsg(inner_db));
         sqlite3_finalize(stmt);
         return false;
     }
-    ret = sqlite3_reset(stmt);
+    DB_COMMAND_INNER(ret, sqlite3_reset(stmt))
     if (ret != SQLITE_OK) {
         LOG(stderr, MSG_ERR "DB_ERR %d: %s\n", __LINE__, ret, sqlite3_errmsg(inner_db));
         sqlite3_finalize(stmt);
@@ -178,8 +204,10 @@ enum DB_GET_RESULT db_get_apelido_exists(void **db, char apelido[static 2]) {
 
     sqlite3_stmt *stmt = NULL;
     sqlite3 *inner_db = *db;
-    int ret = sqlite3_prepare_v2(
-        inner_db, "SELECT apelido FROM pessoa WHERE apelido=?;", -1, &stmt, NULL);
+    int ret;
+    DB_COMMAND_INNER(
+        ret, sqlite3_prepare_v2(inner_db, "SELECT apelido FROM pessoa WHERE apelido=?;",
+                                -1, &stmt, NULL))
     if (ret != SQLITE_OK) {
         LOG(stderr, MSG_ERR "DB_ERR %d: %s\n", __LINE__, ret, sqlite3_errmsg(inner_db));
         sqlite3_finalize(stmt);
@@ -188,14 +216,14 @@ enum DB_GET_RESULT db_get_apelido_exists(void **db, char apelido[static 2]) {
 
     int size = strlen(apelido) > APELIDO_STR_LEN ? APELIDO_STR_LEN : strlen(apelido);
 
-    ret = sqlite3_bind_text(stmt, 1, apelido, size, SQLITE_STATIC);
+    DB_COMMAND_INNER(ret, sqlite3_bind_text(stmt, 1, apelido, size, SQLITE_STATIC))
     if (ret != SQLITE_OK) {
         LOG(stderr, MSG_ERR "DB_ERR %d: %s\n", __LINE__, ret, sqlite3_errmsg(inner_db));
         sqlite3_finalize(stmt);
         return DB_GET_INTERNAL_ERROR;
     }
 
-    ret = sqlite3_step(stmt);
+    DB_COMMAND_INNER(ret, sqlite3_step(stmt));
     bool ret_ok = (ret == SQLITE_OK) | (ret == SQLITE_ROW) | (ret == SQLITE_DONE);
     if (!ret_ok) {
         LOG(stderr, MSG_ERR "DB_ERR %d: %s\n", __LINE__, ret, sqlite3_errmsg(inner_db));
@@ -220,23 +248,27 @@ enum DB_GET_RESULT db_get_pessoa(void **db, Pessoa *pessoa) {
 
     sqlite3_stmt *stmt = NULL;
     sqlite3 *inner_db = *db;
-    int ret = sqlite3_prepare_v2(
-        inner_db, "SELECT apelido, nome, stack, nascimento FROM pessoa WHERE uuid=?;",
-        -1, &stmt, NULL);
+    int ret;
+    DB_COMMAND_INNER(
+        ret, sqlite3_prepare_v2(
+                 inner_db,
+                 "SELECT apelido, nome, stack, nascimento FROM pessoa WHERE uuid=?;",
+                 -1, &stmt, NULL))
 
     if (ret != SQLITE_OK) {
         LOG(stderr, MSG_ERR "DB_ERR: %s\n", __LINE__, sqlite3_errmsg(inner_db));
         sqlite3_finalize(stmt);
         return DB_GET_INTERNAL_ERROR;
     }
-    ret = sqlite3_bind_blob(stmt, 1, pessoa->id, sizeof(pessoa->id), SQLITE_STATIC);
+    DB_COMMAND_INNER(
+        ret, sqlite3_bind_blob(stmt, 1, pessoa->id, sizeof(pessoa->id), SQLITE_STATIC))
     if (ret != SQLITE_OK) {
         LOG(stderr, MSG_ERR "DB_ERR %d: %s\n", __LINE__, ret, sqlite3_errmsg(inner_db));
         sqlite3_finalize(stmt);
         return DB_GET_INTERNAL_ERROR;
     }
 
-    ret = sqlite3_step(stmt);
+    DB_COMMAND_INNER(ret, sqlite3_step(stmt));
     bool ret_ok = (ret == SQLITE_OK) | (ret == SQLITE_ROW) | (ret == SQLITE_DONE);
     if (!ret_ok) {
         LOG(stderr, MSG_ERR "DB_ERR %d: %s\n", __LINE__, ret, sqlite3_errmsg(inner_db));
@@ -295,8 +327,9 @@ enum DB_GET_RESULT db_get_pessoas_term(void **db, const char term[static 2],
     LOG(stdout, "db.c: %d: %s", __LINE__, sql);
     char *zErrMsg = NULL;
     sqlite3 *inner_db = *db;
-    int ret =
-        sqlite3_exec(inner_db, sql, db_inner_get_pessoa, (void *)&pessoas, &zErrMsg);
+    int ret;
+    DB_COMMAND_INNER(ret, sqlite3_exec(inner_db, sql, db_inner_get_pessoa,
+                                       (void *)&pessoas, &zErrMsg))
     bool ret_ok = (ret == SQLITE_OK) | (ret == SQLITE_ROW) | (ret == SQLITE_DONE);
     if (!ret_ok) {
         LOG(stderr, MSG_ERR "DB_ERR %d: %s\n", __LINE__, ret, zErrMsg);

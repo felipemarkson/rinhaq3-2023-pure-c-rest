@@ -3,8 +3,7 @@
 set -e
 
 cd ./src && \
-./build.sh DEBUG && \
-cd ..
+./build.sh -DEBUG && \
 # cp -p db.sqlite.base db.sqlite
-
-./src/main
+./main
+cd ..

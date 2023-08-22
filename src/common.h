@@ -1,5 +1,6 @@
 #ifndef SERVER_COMMON
 #define SERVER_COMMON
+#define _POSIX_C_SOURCE 200809L
 #define _XOPEN_SOURCE
 #define __STDC_WANT_LIB_EXT1__ 1
 #include <signal.h>
@@ -20,7 +21,7 @@
 #define MSG_ERR "Internal error on line %d: "
 #define MAX_DB_TRIES 10
 #define MAX_DB_PESSOAS 50
-#define DB_ADDR "db.sqlite"
+#define DB_ADDR "db/db.sqlite"
 #ifdef DEBUG
 #define LOG(...) fprintf(__VA_ARGS__)
 #else
@@ -58,5 +59,8 @@ typedef struct Pessoa {
 
 bool streq(const char* str1, const char* str2) { return (0 == strcmp(str1, str2)); }
 void print_pessoa(const Pessoa* pessoa);
+
+//                                999999999 (MAX USEC)
+const struct timespec time2sleep = {0,  10L};  // 10 us
 
 #endif

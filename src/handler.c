@@ -55,7 +55,7 @@ bool get_pessoas_id(const char* uuid, struct MHD_Response** out_response) {
     void* db = NULL;
     for (size_t count = 0; count < MAX_DB_TRIES; count++) {
         if (db_open(&db)) break;
-        sleep(1);  // DB_BUSY;
+        nanosleep(&time2sleep, NULL);  // DB_BUSY;
     }
     if (NULL == db) {
         LOG(stderr, "Could not open a DB connection after %d tries\n", MAX_DB_TRIES);
@@ -80,7 +80,7 @@ bool get_pessoas_term(const char* term, struct MHD_Response** out_response) {
     void* db = NULL;
     for (size_t count = 0; count < MAX_DB_TRIES; count++) {
         if (db_open(&db)) break;
-        sleep(1);  // DB_BUSY;
+        nanosleep(&time2sleep, NULL);  // DB_BUSY;
     }
     if (NULL == db) {
         LOG(stderr, "Could not open a DB connection after %d tries\n", MAX_DB_TRIES);
@@ -94,6 +94,7 @@ bool get_pessoas_term(const char* term, struct MHD_Response** out_response) {
         db_close(&db);
         return false;
     }
+    db_close(&db);
     char buffer[MAX_LIST_PESSOAS_PAYLOAD] = {0};
 
     parse_pessoas_as_list(buffer, pessoas);
@@ -162,30 +163,12 @@ static void request_completed(void* cls, struct MHD_Connection* connection,
     (void)cls;
     (void)toe;
     (void)connection;
+    LOG(stdout, "TERMINATION CODE: %d\n", toe);
+
     if (NULL == *reqptr) return;  // it is a GET or some error. Nothing to do.
     Post* post = *reqptr;
-    Response result = post->http_code;
     Pessoa* pessoa = post->pessoa;
     free(post);
-    if (result != RESPONSE_CREATED) {  // Some other error. Nothing to do.
-        free(pessoa);
-        return;
-    }
-
-    void* db = NULL;
-    for (size_t count = 0; count < MAX_DB_TRIES; count++) {
-        if (db_open(&db)) break;
-        sleep(1);  // DB_BUSY;
-    }
-    if (NULL == db) {
-        LOG(stderr, "Could not open a DB connection after %d tries\n", MAX_DB_TRIES);
-        fflush(stderr);
-        return;
-    }
-
-    LOG(stdout, "Sucessfully created a new DB connection\n");
-    db_insert_pessoa(&db, pessoa);
-    db_close(&db);
     uuid_clear(pessoa->id);
     free(pessoa);
 }
@@ -292,19 +275,24 @@ enum MHD_Result handler(void* cls, struct MHD_Connection* connection, const char
                     db_get_apelido_exists(&db, post->pessoa->apelido);
                 switch (get_ret) {
                     case DB_GET_INTERNAL_ERROR: {
+                        db_close(&db);
                         post->http_code = RESPONSE_INTERNAL_ERROR;
                         return MHD_YES;
                     }
                     case DB_GET_OK: {
+                        db_close(&db);
                         post->http_code = RESPONSE_UNPROCESSABLE;
                         return MHD_YES;
                     }
                     case DB_GET_NOT_FOUND: {
                         uuid_generate(post->pessoa->id);
                         post->http_code = RESPONSE_CREATED;
+                        db_insert_pessoa(&db, post->pessoa);
+                        db_close(&db);
                         return MHD_YES;
                     }
                     default: {
+                        db_close(&db);
                         LOG(stderr, MSG_ERR "Unreachable state\n", __LINE__);
                         post->http_code = RESPONSE_INTERNAL_ERROR;
                         return MHD_YES;
@@ -312,6 +300,7 @@ enum MHD_Result handler(void* cls, struct MHD_Connection* connection, const char
                 }
             }
             case POST_STAGE_RESPONSING: {
+                LOG(stdout, "HTTP RESPONSE: %d\n", post->http_code);
                 response = build_response_empty();
                 char buffer[9 + ID_STR_LEN + 1] = {'/', 'p', 'e', 's', 's',
                                                    'o', 'a', 's', '/'};

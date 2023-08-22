@@ -13,7 +13,6 @@ void sighandler(int sig) {
     else if (sig == SIGSEGV)
         printf("received SIGSEGV oh... oh...\n");
     fflush(stdout);
-    db_close(g_db);
     _exit(sig);
 }
 
@@ -35,10 +34,11 @@ int main(void) {
     if (!db_open(&g_db)) return EXIT_FAILURE;
     if (!db_create_tables(&g_db)) return EXIT_FAILURE;
     if (!db_list_tables(&g_db)) return EXIT_FAILURE;
+    db_close(&g_db);
 
     MHD_AccessHandlerCallback dh = (MHD_AccessHandlerCallback)&handler;
-    struct MHD_Daemon *d = MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION, PORT, NULL,
-                                            NULL, dh, NULL, MHD_OPTION_NOTIFY_COMPLETED,
+    struct MHD_Daemon *d = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY, PORT, NULL, NULL,
+                                            dh, NULL, MHD_OPTION_NOTIFY_COMPLETED,
                                             &request_completed, NULL, MHD_OPTION_END);
     if (d == NULL) {
         LOG(stderr, "Error on start deamon\n");

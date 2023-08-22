@@ -1,8 +1,8 @@
 set -e
 cd src
-rm *.o
-rm main
+rm -f *.o
+rm -f main
 cd ..
 
 sudo docker build . -t rinha && \
-sudo docker compose up
+sudo docker compose up --remove-orphans 
