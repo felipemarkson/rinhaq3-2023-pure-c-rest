@@ -16,6 +16,7 @@ typedef enum {
     RESPONSE_UNPROCESSABLE = MHD_HTTP_UNPROCESSABLE_CONTENT,
     RESPONSE_INTERNAL_ERROR = MHD_HTTP_INTERNAL_SERVER_ERROR,
     RESPONSE_BAD_REQUEST = MHD_HTTP_BAD_REQUEST,
+    RESPONSE_NOT_FOUND = MHD_HTTP_NOT_FOUND,
 } Response;
 
 typedef struct {
@@ -24,9 +25,9 @@ typedef struct {
     Pessoa* pessoa;
 } Post;
 
-struct MHD_Response* build_response(char* json, enum MHD_ResponseMemoryMode mode) {
+struct MHD_Response* build_response(char* str, enum MHD_ResponseMemoryMode mode) {
     struct MHD_Response* response =
-        MHD_create_response_from_buffer(strlen(json), (void*)json, mode);
+        MHD_create_response_from_buffer(strlen(str), (void*)str, mode);
     if (response == NULL) return NULL;
 
     MHD_add_response_header(response, "Content-Type", "application/json");
@@ -59,7 +60,6 @@ bool get_pessoas_id(const char* uuid, struct MHD_Response** out_response) {
     }
     if (NULL == db) {
         LOG(stderr, "Could not open a DB connection after %d tries\n", MAX_DB_TRIES);
-        fflush(stderr);
         return false;  // TODO: THIS SHOULD BE INTERNAL ERROR.
     }
     enum DB_GET_RESULT result;
@@ -84,7 +84,6 @@ bool get_pessoas_term(const char* term, struct MHD_Response** out_response) {
     }
     if (NULL == db) {
         LOG(stderr, "Could not open a DB connection after %d tries\n", MAX_DB_TRIES);
-        fflush(stderr);
         return false;
     }
 
@@ -107,6 +106,25 @@ bool get_pessoas_term(const char* term, struct MHD_Response** out_response) {
 
 unsigned int get_handler(struct MHD_Connection* connection, const char* url,
                          struct MHD_Response** out_response) {
+    if (streq(url, "/contagem-pessoas")) {
+        void* db = NULL;
+        char count_pessoas[100] = {0};
+        enum DB_GET_RESULT result;
+        db_open(&db);
+        if (NULL == db) {
+            LOG(stderr, "Could not open a DB connection after %d tries\n",
+                MAX_DB_TRIES);
+            return MHD_HTTP_INTERNAL_SERVER_ERROR;
+        }
+        result = db_count_pessoas(&db, count_pessoas);
+        db_close(&db);
+        if (result != DB_GET_OK) {
+            return MHD_HTTP_INTERNAL_SERVER_ERROR;
+        }
+        *out_response = build_response(count_pessoas, MHD_RESPMEM_MUST_COPY);
+        return MHD_HTTP_OK;
+    }
+
     if (strstr(url, "/pessoas") != url) {
         *out_response = bad_request();
         return MHD_HTTP_BAD_REQUEST;
@@ -140,10 +158,7 @@ unsigned int get_handler(struct MHD_Connection* connection, const char* url,
     return MHD_HTTP_BAD_REQUEST;
 }
 
-bool isvalid_post(size_t size, const char* url) {
-    if (size < MIN_PESSOA_JSON_SIZE) {
-        return false;
-    }
+bool isvalid_url(const char* url) {
     bool url_ok = !strcmp(url, "/pessoas") | !strcmp(url, "/pessoas/");
     if (!url_ok) {
         return false;
@@ -169,6 +184,7 @@ static void request_completed(void* cls, struct MHD_Connection* connection,
     Post* post = *reqptr;
     Pessoa* pessoa = post->pessoa;
     free(post);
+    if (pessoa == NULL) return;
     uuid_clear(pessoa->id);
     free(pessoa);
 }
@@ -226,8 +242,8 @@ enum MHD_Result handler(void* cls, struct MHD_Connection* connection, const char
                 return MHD_YES;
             }
             case POST_STAGE_PROCESSING: {
-                if (!isvalid_post(data_size, url)) {
-                    post->http_code = RESPONSE_UNPROCESSABLE;
+                if (!isvalid_url(url)) {
+                    post->http_code = RESPONSE_NOT_FOUND;
                     return MHD_YES;
                 }
                 LOG(stdout, "POST REQ: URL %s | Data recived: %s\n", url, upload_data);
@@ -302,6 +318,12 @@ enum MHD_Result handler(void* cls, struct MHD_Connection* connection, const char
             case POST_STAGE_RESPONSING: {
                 LOG(stdout, "HTTP RESPONSE: %d\n", post->http_code);
                 response = build_response_empty();
+                if (post->http_code != RESPONSE_CREATED) {
+                    ret = MHD_queue_response(connection, post->http_code, response);
+                    MHD_destroy_response(response);
+                    return ret;
+                }
+
                 char buffer[9 + ID_STR_LEN + 1] = {'/', 'p', 'e', 's', 's',
                                                    'o', 'a', 's', '/'};
                 uuid_unparse(post->pessoa->id, &(buffer[9]));

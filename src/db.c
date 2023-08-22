@@ -38,7 +38,6 @@ bool db_open(void **db) {
     DB_COMMAND_INNER(ret, sqlite3_open(DB_ADDR, &inner_db))
     if (ret) {
         LOG(stderr, "Can't open database: %s\n", sqlite3_errmsg(inner_db));
-        fflush(stderr);
         sqlite3_close(inner_db);
         return false;
     }
@@ -98,7 +97,6 @@ bool db_list_tables(void **db) {
                                        &db_list_tables_callback, &count, &zErrMsg))
     if (ret != SQLITE_OK) {
         fprintf(stderr, "SQL error: %s\n", zErrMsg);
-        fflush(stderr);
         sqlite3_free(zErrMsg);
         return false;
     }
@@ -336,5 +334,38 @@ enum DB_GET_RESULT db_get_pessoas_term(void **db, const char term[static 2],
         sqlite3_free(zErrMsg);
         return DB_GET_INTERNAL_ERROR;
     }
+    return DB_GET_OK;
+}
+
+enum DB_GET_RESULT db_count_pessoas(void **db, char out[static 100]) {
+    sqlite3 *inner_db = *db;
+    sqlite3_stmt *stmt = NULL;
+    int ret;
+    DB_COMMAND_INNER(ret, sqlite3_prepare_v2(inner_db, "SELECT COUNT(*) FROM pessoa;",
+                                             -1, &stmt, NULL))
+    if (ret != SQLITE_OK) {
+        LOG(stderr, MSG_ERR "DB_ERR %d: %s\n", __LINE__, ret, sqlite3_errmsg(inner_db));
+        sqlite3_finalize(stmt);
+        return DB_GET_INTERNAL_ERROR;
+    }
+
+    DB_COMMAND_INNER(ret, sqlite3_step(stmt));
+    bool ret_ok = (ret == SQLITE_OK) | (ret == SQLITE_ROW) | (ret == SQLITE_DONE);
+    if (!ret_ok) {
+        LOG(stderr, MSG_ERR "DB_ERR %d: %s\n", __LINE__, ret, sqlite3_errmsg(inner_db));
+        sqlite3_finalize(stmt);
+        return DB_GET_INTERNAL_ERROR;
+    }
+    if (ret != SQLITE_ROW) {
+        sqlite3_finalize(stmt);
+        out[0] = '0';
+        return DB_GET_OK;
+    }
+
+    int value = sqlite3_column_int(stmt, 0);
+    int type = sqlite3_column_type(stmt, 0);
+    printf("%d", type);
+    snprintf(out, 99, "%d", value);
+    sqlite3_finalize(stmt);
     return DB_GET_OK;
 }
