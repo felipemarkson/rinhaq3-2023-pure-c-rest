@@ -41,17 +41,17 @@ bool db_open(void **db) {
         sqlite3_close(inner_db);
         return false;
     }
-    // char *zErrMsg = NULL;
-    // DB_COMMAND_INNER(
-    //     ret, sqlite3_exec(inner_db, "PRAGMA journal_mode=WAL;", NULL, NULL,
-    //     &zErrMsg))
-    // if (ret != SQLITE_OK) {
-    //     LOG(stderr, "Can't open database. SQL error: %s\n", zErrMsg);
-    //     sqlite3_free(zErrMsg);
-    //     sqlite3_close(inner_db);
-    //     return false;
-    // }
-    // sqlite3_free(zErrMsg);
+    char *zErrMsg = NULL;
+    DB_COMMAND_INNER(
+        ret, sqlite3_exec(inner_db, "PRAGMA journal_mode=WAL;", NULL, NULL,
+        &zErrMsg))
+    if (ret != SQLITE_OK) {
+        LOG(stderr, "Can't open database. SQL error: %s\n", zErrMsg);
+        sqlite3_free(zErrMsg);
+        sqlite3_close(inner_db);
+        return false;
+    }
+    sqlite3_free(zErrMsg);
     *db = inner_db;
     return true;
 }

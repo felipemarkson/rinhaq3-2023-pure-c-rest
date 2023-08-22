@@ -1,3 +1,3 @@
 set -xe
 sudo docker-compose down
-sudo docker volume rm rinha_shared
+sudo docker volume rm fmarkson_shared

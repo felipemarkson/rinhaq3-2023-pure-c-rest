@@ -60,7 +60,7 @@ typedef struct Pessoa {
 bool streq(const char* str1, const char* str2) { return (0 == strcmp(str1, str2)); }
 void print_pessoa(const Pessoa* pessoa);
 
-//                                999999999 (MAX USEC)
-const struct timespec time2sleep = {0,  10L};  // 10 us
+//                                    999999999 (MAX USEC)
+const struct timespec time2sleep = {0,       5L};  // 50 us
 
 #endif

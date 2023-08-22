@@ -1,7 +1,7 @@
 version: '3.5'
 services:
   api1: # API - Instância 01
-    image: rinha:latest
+    image: fmarkson/rinhaq3-2023-pure-c-rest
     restart: always
     networks:
       - api-side
@@ -13,10 +13,10 @@ services:
       resources:
         limits:
           cpus: '0.65'
-          memory: '1.00GB'
+          memory: '0.70GB'
     
   api2: # API - Instância 02
-    image: rinha:latest
+    image: fmarkson/rinhaq3-2023-pure-c-rest
     restart: always
     depends_on:
       - api1
@@ -30,7 +30,7 @@ services:
       resources:
         limits:
           cpus: '0.65'
-          memory: '1.00GB'
+          memory: '0.70GB'
 
   nginx: # Load Balancer
     image: nginx:latest
@@ -45,7 +45,7 @@ services:
       resources:
         limits:
           cpus: '0.2'
-          memory: '1.00GB'
+          memory: '1.60GB' # To hold all waiting requests
     networks:
       - api-side
 
