@@ -8,11 +8,11 @@ In third quarter of 2023 [Francisco Zanfranceschi](https://github.com/zanfrances
 
 At the moment of the tournament, I was learning the _beauty_ of system programming languages like C, C++, Rust, etc. Thus, I decided to implement Francisco's challenge in _pure_ C. It is by itself a huge challenge. However, I also decided to use the _loved_ SQLite as a database. What can be wrong? Right?
 
-Note that, this stress test makes any unadvised (or inexperienced) developer cries in his bed because it simulates the usage of more than 10k users in the majority doing insertions in the database.
-
-Unfortunately, I just had 30 hours to implement it because of my job and family.
+Note that, this stress test makes any unadvised (or inexperienced) developer cries in his bed because it simulates the usage of more than 500 red/s in the majority doing insertions in the database.
 
 I made all the stress tests and it is passing! SQLite is impressive fast, but it was designed to run in a single thread. To overcome this issue, I just add a `while` and a sleep delay waiting for the database to be ready to write/read. It is a silly solution, but it is working.
+
+Unfortunately, I just had 30 hours to implement it because of my job and family. Thus, please, don't expected any desing pattern, unit test, or DDD. I just want this experiment works and I didn't have enought time to make it mantainable and clean. 
 
 ## API Documentation
 
